@@ -37,8 +37,8 @@ voice-app/
 ## Installation
 
 ```bash
-git clone <your-repo-url> voice-app
-cd voice-app
+git clone <your-repo-url> whatsapp-voice-agent-phase1
+cd whatsapp-voice-agent-phase1
 
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
