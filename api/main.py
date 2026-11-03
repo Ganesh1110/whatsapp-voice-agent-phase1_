@@ -19,10 +19,11 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
+import llm as llm_pkg  # noqa: E402
 import stt as stt_pkg  # noqa: E402
 import tts as tts_pkg  # noqa: E402
 
-from . import stt_routes, tts_routes  # noqa: E402
+from . import ari_routes, llm_routes, stt_routes, tts_routes, voice_routes  # noqa: E402
 from .schemas import APIError, HealthResponse  # noqa: E402
 
 logging.basicConfig(
@@ -43,13 +44,14 @@ async def lifespan(app: FastAPI):
                 stt_pkg.get_stt_model(name).load()
             elif name in tts_pkg.available_tts_models():
                 tts_pkg.get_tts_model(name).load()
+            elif name in llm_pkg.available_llm_models():
+                llm_pkg.get_llm_model(name).load()
             else:
                 logger.warning("PRELOAD_MODELS: unknown model '%s'", name)
         except Exception:
             # Don't block startup; the error will surface again on first request.
             logger.exception("Could not preload '%s'", name)
     yield
-
 
 app = FastAPI(
     title="Voice App - Phase 1",
@@ -100,16 +102,26 @@ async def unhandled_error_handler(_: Request, exc: Exception) -> JSONResponse:
 def health() -> HealthResponse:
     loaded = [n for n in stt_pkg.available_stt_models() if n in stt_pkg._instances and stt_pkg._instances[n].is_loaded]
     loaded += [n for n in tts_pkg.available_tts_models() if n in tts_pkg._instances and tts_pkg._instances[n].is_loaded]
+    loaded += [n for n in llm_pkg.available_llm_models() if n in llm_pkg._instances and llm_pkg._instances[n].is_ready]
     return HealthResponse(
         stt_models=stt_pkg.available_stt_models(),
         tts_models=tts_pkg.available_tts_models(),
+        llm_models=llm_pkg.available_llm_models(),
         loaded_models=loaded,
     )
 
 
 app.include_router(stt_routes.router)
 app.include_router(tts_routes.router)
+app.include_router(llm_routes.router)
+app.include_router(voice_routes.router)
+app.include_router(ari_routes.router)
 
 # Serve the frontend at "/" (mounted last so API routes take priority).
 if FRONTEND_DIR.is_dir():
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+# Serve generated voice audio at /outputs/<file>.
+OUTPUTS_DIR = Path(__file__).resolve().parent.parent / "outputs"
+if OUTPUTS_DIR.is_dir():
+    app.mount("/outputs", StaticFiles(directory=OUTPUTS_DIR), name="outputs")
