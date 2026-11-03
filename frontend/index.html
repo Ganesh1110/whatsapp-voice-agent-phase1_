@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice App – STT &amp; TTS</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Voice App <span class="badge">Phase 1</span></h1>
+    <p>Test Malayalam Speech-to-Text and Text-to-Speech</p>
+    <p class="status" id="serverStatus">Checking server…</p>
+  </header>
+
+  <main class="container">
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" role="tab" aria-selected="true" data-tab="stt">🎙️ Speech to Text</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="tts">🔊 Text to Speech</button>
+    </nav>
+
+    <!-- Speech-to-Text -->
+    <section class="card" id="tab-stt" role="tabpanel">
+      <h2>Speech to Text</h2>
+
+      <label for="sttFile">Audio file</label>
+      <input type="file" id="sttFile" accept=".wav,.mp3,.ogg,.opus,.m4a,.mp4,.flac,.webm,.aac,audio/*" />
+      <p class="hint">wav, mp3, ogg, opus, m4a, mp4, flac, webm, aac</p>
+
+      <div class="record-controls">
+        <button class="btn" id="recordBtn" type="button">● Record voice</button>
+        <button class="btn secondary hidden" id="stopRecordBtn" type="button">Stop recording</button>
+        <span class="recording-status hidden" id="recordingStatus" role="status">Recording…</span>
+      </div>
+      <audio class="recording-preview hidden" id="recordingPreview" controls></audio>
+      <p class="hint">Recording requires microphone permission and a secure connection (localhost or HTTPS).</p>
+
+      <label for="sttModel">Model</label>
+      <select id="sttModel">
+        <option value="whisper">OpenAI Whisper</option>
+        <option value="indicconformer">AI4Bharat IndicConformer</option>
+      </select>
+
+      <button class="btn" id="sttBtn">Transcribe</button>
+
+      <div class="loading hidden" id="sttLoading"><span class="spinner"></span> Transcribing… the first request may take a while while the model loads.</div>
+      <div class="error hidden" id="sttError" role="alert"></div>
+
+      <div class="result hidden" id="sttResult">
+        <h3>Recognised text</h3>
+        <textarea id="sttText" rows="5" readonly></textarea>
+        <p class="hint" id="sttMeta"></p>
+      </div>
+    </section>
+
+    <!-- Text-to-Speech -->
+    <section class="card hidden" id="tab-tts" role="tabpanel">
+      <h2>Text to Speech</h2>
+
+      <label for="ttsText">Malayalam text</label>
+      <textarea id="ttsText" rows="5" placeholder="ഇവിടെ മലയാളം ടെക്സ്റ്റ് ടൈപ്പ് ചെയ്യുക…"></textarea>
+
+      <label>Model</label>
+      <p class="model-fixed"><code>facebook/mms-tts-mal</code></p>
+
+      <button class="btn" id="ttsBtn">Generate Speech</button>
+
+      <div class="loading hidden" id="ttsLoading"><span class="spinner"></span> Generating speech… the first request may take a while while the model loads.</div>
+      <div class="error hidden" id="ttsError" role="alert"></div>
+
+      <div class="result hidden" id="ttsResult">
+        <h3>Generated audio</h3>
+        <audio id="ttsAudio" controls></audio>
+        <a class="btn secondary" id="ttsDownload" download="speech.wav">⬇ Download</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

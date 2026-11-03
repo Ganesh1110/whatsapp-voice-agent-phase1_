@@ -1,0 +1,93 @@
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --border: #d9dee8;
+  --error-bg: #fef2f2;
+  --error-text: #b91c1c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Malayalam", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.header { text-align: center; padding: 2rem 1rem 1rem; }
+.header h1 { margin: 0; font-size: 1.8rem; }
+.header p { margin: .25rem 0 0; color: var(--muted); }
+.badge {
+  font-size: .7rem; vertical-align: middle; background: var(--primary); color: #fff;
+  padding: .15rem .5rem; border-radius: 999px;
+}
+.status { font-size: .85rem; }
+.status.ok { color: #15803d; }
+.status.down { color: var(--error-text); }
+
+.container { max-width: 720px; margin: 0 auto; padding: 0 1rem 3rem; }
+
+.tabs { display: flex; gap: .5rem; margin-bottom: 1rem; }
+.tab {
+  flex: 1; padding: .75rem; border: 1px solid var(--border); background: var(--card);
+  border-radius: 10px; font-size: 1rem; cursor: pointer; color: var(--text);
+}
+.tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 1.5rem; box-shadow: 0 2px 8px rgba(0, 0, 0, .04);
+}
+.card h2 { margin-top: 0; }
+.card h3 { margin: 1.25rem 0 .5rem; font-size: 1rem; }
+
+label { display: block; margin: 1rem 0 .35rem; font-weight: 600; font-size: .9rem; }
+input[type="file"], select, textarea {
+  width: 100%; padding: .6rem; border: 1px solid var(--border); border-radius: 8px;
+  font: inherit; background: #fff;
+}
+textarea { resize: vertical; }
+
+.hint { color: var(--muted); font-size: .8rem; margin: .25rem 0 0; }
+.model-fixed { margin: 0; }
+.record-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.record-controls .btn { margin-top: 1rem; }
+.recording-status { color: var(--error-text); font-weight: 600; }
+.recording-preview { width: 100%; margin-top: 1rem; }
+code { background: #eef0f7; padding: .1rem .4rem; border-radius: 4px; }
+
+.btn {
+  display: inline-block; margin-top: 1.25rem; padding: .7rem 1.4rem; border: none;
+  border-radius: 8px; background: var(--primary); color: #fff; font-size: 1rem;
+  cursor: pointer; text-decoration: none;
+}
+.btn:hover { background: var(--primary-dark); }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.btn.secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); margin-top: .75rem; }
+
+.loading { margin-top: 1rem; color: var(--muted); display: flex; align-items: center; gap: .6rem; }
+.spinner {
+  width: 18px; height: 18px; border: 3px solid var(--border); border-top-color: var(--primary);
+  border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  margin-top: 1rem; padding: .75rem 1rem; background: var(--error-bg);
+  color: var(--error-text); border-radius: 8px; border: 1px solid #fecaca;
+}
+
+.result audio { width: 100%; display: block; }
+.hidden { display: none !important; }
+
+@media (max-width: 480px) {
+  .header h1 { font-size: 1.4rem; }
+  .card { padding: 1rem; }
+  .btn { width: 100%; text-align: center; }
+}
