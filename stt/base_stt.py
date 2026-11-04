@@ -4,6 +4,8 @@ Every STT model implements `BaseSTT`. Models are loaded lazily (on first use)
 so the API starts fast and tests never need to download weights.
 """
 import logging
+import shutil
+import subprocess
 import threading
 from abc import ABC, abstractmethod
 
@@ -30,6 +32,35 @@ def load_audio(path: str, sample_rate: int = TARGET_SAMPLE_RATE):
 
     Formats like mp3/m4a/webm need `ffmpeg` installed on the system.
     """
+    # librosa/soundfile often cannot read browser MediaRecorder WebM/Opus on
+    # macOS, so decode that container through system or bundled ffmpeg.
+    if path.lower().endswith((".webm", ".opus", ".ogg")):
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            try:
+                import imageio_ffmpeg
+
+                ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+            except (ImportError, RuntimeError) as exc:
+                raise TranscriptionError(
+                    "Cannot decode browser recording: install ffmpeg with `brew install ffmpeg` "
+                    "or install the bundled fallback with `pip install imageio-ffmpeg`."
+                ) from exc
+        try:
+            import numpy as np
+
+            result = subprocess.run(
+                [ffmpeg, "-v", "error", "-i", path, "-f", "f32le", "-acodec", "pcm_f32le", "-ac", "1", "-ar", str(sample_rate), "pipe:1"],
+                check=True,
+                capture_output=True,
+            )
+            audio = np.frombuffer(result.stdout, dtype=np.float32)
+        except Exception as exc:
+            raise TranscriptionError(f"Could not decode audio with ffmpeg: {exc}") from exc
+        if audio.size == 0:
+            raise TranscriptionError("The audio file contains no samples.")
+        return audio
+
     try:
         import librosa
 
