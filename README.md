@@ -50,11 +50,18 @@ cp .env.example .env               # then edit if needed
 
 ## Model setup
 
-Weights are **not** stored in the repo. They download automatically the first time a model is used (so the first request is slow), or you can preload them at startup with `PRELOAD_MODELS=whisper,indic-parler-tts` in `.env`.
+Weights are **not** stored in the repo. By default, models download automatically the first time they are used. For Whisper, you can download the snapshot into this machine before starting the API, then run from that local copy (including offline):
+
+```bash
+source .venv/bin/activate
+python scripts/download_whisper.py
+```
+
+This saves the configured model (`openai/whisper-small` by default) to `models/whisper-small`. The app detects that directory and loads it locally. Set `WHISPER_MODEL_PATH=/your/path/to/model` in `.env` to use a different directory. To switch model versions, change `WHISPER_MODEL_ID` before running the download command. Downloading requires internet access once; STT inference afterward uses the local files. You can also preload the model at server startup with `PRELOAD_MODELS=whisper` in `.env`.
 
 | Model | Hugging Face ID | Notes |
 |---|---|---|
-| Whisper | `openai/whisper-large-v3` (default) | Better Malayalam accuracy; needs more RAM/GPU. Set `WHISPER_MODEL_ID` to a local directory to load offline. |
+| Whisper | `openai/whisper-small` (default) | Set `WHISPER_MODEL_ID=openai/whisper-large-v3` before downloading for better Malayalam accuracy (needs more RAM/GPU) |
 | IndicConformer | `ai4bharat/indic-conformer-600m-multilingual` | Loaded with `trust_remote_code=True`. If you get a 401/403, accept the model's terms on its Hugging Face page and set `HF_TOKEN` in `.env`. If loading fails on a missing package, check the model card for its current requirements. |
 | Indic Parler-TTS | `ai4bharat/indic-parler-tts` (default) | Natural Malayalam speech; GPU recommended. |
 | MMS TTS | `facebook/mms-tts-mal` | Lightweight VITS fallback, outputs 16 kHz audio. |

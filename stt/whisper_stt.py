@@ -79,15 +79,29 @@ class WhisperSTT(BaseSTT):
     def __init__(self, model_id: str | None = None) -> None:
         super().__init__()
         # whisper-small is a reasonable CPU default; use whisper-large-v3 on a GPU for better Malayalam.
-        self.model_id = os.path.expanduser(
-            model_id or os.getenv("WHISPER_MODEL_ID", "openai/whisper-small")
-        )
+        self.model_id = model_id or os.getenv("WHISPER_MODEL_ID", "openai/whisper-small")
+        # The download helper uses this default; an explicit path supports custom locations.
+        configured_path = os.getenv("WHISPER_MODEL_PATH", "models/whisper-small").strip()
+        self.model_path = configured_path if os.path.isdir(configured_path) else ""
+        self.invalid_model_path = configured_path if os.getenv("WHISPER_MODEL_PATH") and not self.model_path else ""
         self._pipe = None
 
-    def _build_pipeline(self, pipeline, torch, device: str, dtype):
-        return pipeline(
+    def _load(self) -> None:
+        if self.invalid_model_path:
+            raise FileNotFoundError(f"WHISPER_MODEL_PATH does not exist: {self.invalid_model_path}")
+        import torch
+        from transformers import pipeline
+
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        model_source = self.model_path or self.model_id
+        logger.info("Whisper '%s' on %s", model_source, device)
+        # A filesystem path is unambiguously local; don't pass local_files_only
+        # through model_kwargs because pipeline also supplies it to AutoConfig.
+        self._pipe = pipeline(
             "automatic-speech-recognition",
-            model=self.model_id,
+            model=model_source,
+            tokenizer=model_source,
+            feature_extractor=model_source,
             device=device,
             torch_dtype=dtype,
             model_kwargs={"low_cpu_mem_usage": True},
