@@ -13,6 +13,7 @@ soundfile>=0.12
 # --- Models ---
 torch>=2.1
 transformers>=4.40
+huggingface_hub[cli]>=0.34    # provides the `hf` CLI (`hf download ...`)
 onnxruntime>=1.17            # used by AI4Bharat IndicConformer (check the model card if loading fails)
 
 # --- Testing ---

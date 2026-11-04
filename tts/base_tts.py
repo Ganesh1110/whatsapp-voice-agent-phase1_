@@ -44,6 +44,7 @@ class BaseTTS(ABC):
     def __init__(self) -> None:
         self._loaded = False
         self._lock = threading.Lock()
+        self._infer_lock = threading.Lock()
 
     @property
     def is_loaded(self) -> bool:
@@ -76,7 +77,10 @@ class BaseTTS(ABC):
             raise SynthesisError("Text is empty.")
         self.load()
         try:
-            return self._synthesize(text.strip())
+            # Serialise inference: a single CPU/GPU model cannot run several
+            # generations in parallel without thrashing and slowing everything.
+            with self._infer_lock:
+                return self._synthesize(text.strip())
         except TTSError:
             raise
         except Exception as exc:

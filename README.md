@@ -1,6 +1,6 @@
 # Voice App – Phase 1 (STT + TTS)
 
-A standalone Malayalam voice-processing service: **Speech-to-Text** (Whisper, AI4Bharat IndicConformer) and **Text-to-Speech** (`facebook/mms-tts-mal`), exposed through a FastAPI backend with a simple web frontend.
+A standalone Malayalam voice-processing service (mixed Malayalam-English is supported for TTS): **Speech-to-Text** (Whisper, AI4Bharat IndicConformer) and **Text-to-Speech** (`ai4bharat/indic-parler-tts`, with `facebook/mms-tts-mal` as a lighter fallback), exposed through a FastAPI backend with a simple web frontend.
 
 This is **Phase 1** of a WhatsApp AI agent. WhatsApp, n8n and LLM-agent integration are intentionally *not* included; they come in Phase 2.
 
@@ -11,6 +11,7 @@ This is **Phase 1** of a WhatsApp AI agent. WhatsApp, n8n and LLM-agent integrat
 - `GET /health` – health check (also lists registered/loaded models)
 - Swagger UI at `/docs`
 - Responsive frontend (tabs for STT and TTS, loading states, error messages, audio player and download)
+- Browser **Phone Call** mode: the AI greets you first, then listens/responds automatically using silence detection until you press **End Call**; you can also type your reply in the **You said** box and press **Send typed message**
 - Plugin-style model registries, so new models can be added without touching the API
 
 ## Project structure
@@ -31,7 +32,7 @@ voice-app/
 - Python 3.10+
 - **ffmpeg** (needed to decode mp3 / m4a / webm / opus uploads)
   - macOS: `brew install ffmpeg` · Ubuntu: `sudo apt install ffmpeg` · Windows: `winget install ffmpeg`
-- ~2–6 GB of disk for model weights (downloaded from Hugging Face on first use and cached outside the repo)
+- ~2–24 GB of disk for model weights (downloaded from Hugging Face on first use and cached outside the repo)
 - A GPU is optional; models fall back to CPU automatically
 
 ## Installation
@@ -49,13 +50,14 @@ cp .env.example .env               # then edit if needed
 
 ## Model setup
 
-Weights are **not** stored in the repo. They download automatically the first time a model is used (so the first request is slow), or you can preload them at startup with `PRELOAD_MODELS=whisper,mms` in `.env`.
+Weights are **not** stored in the repo. They download automatically the first time a model is used (so the first request is slow), or you can preload them at startup with `PRELOAD_MODELS=whisper,indic-parler-tts` in `.env`.
 
 | Model | Hugging Face ID | Notes |
 |---|---|---|
-| Whisper | `openai/whisper-small` (default) | Set `WHISPER_MODEL_ID=openai/whisper-large-v3` for better Malayalam accuracy (needs more RAM/GPU) |
+| Whisper | `openai/whisper-large-v3` (default) | Better Malayalam accuracy; needs more RAM/GPU. Set `WHISPER_MODEL_ID` to a local directory to load offline. |
 | IndicConformer | `ai4bharat/indic-conformer-600m-multilingual` | Loaded with `trust_remote_code=True`. If you get a 401/403, accept the model's terms on its Hugging Face page and set `HF_TOKEN` in `.env`. If loading fails on a missing package, check the model card for its current requirements. |
-| MMS TTS | `facebook/mms-tts-mal` | Malayalam, VITS-based, outputs 16 kHz audio |
+| Indic Parler-TTS | `ai4bharat/indic-parler-tts` (default) | Natural Malayalam speech; GPU recommended. |
+| MMS TTS | `facebook/mms-tts-mal` | Lightweight VITS fallback, outputs 16 kHz audio. |
 
 > The IndicConformer integration follows the usage shown on its model card. It has not been run end-to-end in the environment this project was generated in, so test it on your machine and adjust `stt/indicconformer_stt.py` if the model's interface has changed.
 
@@ -65,13 +67,35 @@ The defaults in `.env` are set for your stack:
 
 | Stage | Model | Where it runs | Env var |
 |-------|-------|---------------|---------|
-| STT | `openai/whisper-large-v3` | Local RTX 5060 Ti 16GB | `WHISPER_MODEL_ID` (point to a local HF path if you already downloaded it) |
-| LLM | `google/gemma-4-E4B-it` | AWS GPU server | `LLM_HOST=https://<your-aws-instance>` + `LLM_API_STYLE=ollama\|openai` |
-| TTS | `ai4bharat/indic-parler-tts` | Local (GPU if available) | `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DESCRIPTION` |
+| STT | `openai/whisper-large-v3` | Local RTX 5060 Ti 16GB | `WHISPER_MODEL_ID` (local HF path or Hub ID) |
+| LLM | `google/gemma-4-E4B-it` | AWS GPU server (vLLM) | `LLM_HOST`, `LLM_MODEL`, `LLM_API_STYLE=openai`, optional `LLM_API_KEY` |
+| TTS | `ai4bharat/indic-parler-tts` | Local (GPU if available) | `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DESCRIPTION`, `INDIC_PARLER_TTS_DTYPE`, `INDIC_PARLER_TTS_MAX_AUDIO_SECONDS` |
 
 If you already downloaded `whisper-large-v3` to your PC via HF, set `WHISPER_MODEL_ID` to that local directory path instead of the Hub ID so it loads offline (`HF_HUB_OFFLINE=1`). The STT/TTS code auto-detects CUDA, so both will run on your local GPU when available.
 
-Point `LLM_HOST` at the AWS instance serving gemma. If you serve it with Ollama, use `LLM_API_STYLE=ollama`; if with vLLM/TGI (OpenAI-compatible), use `LLM_API_STYLE=openai`.
+Download the large model once (the `hf` CLI comes from `huggingface_hub[cli]`):
+
+```bash
+hf download openai/whisper-large-v3 --local-dir ~/models/whisper-large-v3
+```
+
+Then point the app at it in `.env`:
+
+```bash
+WHISPER_MODEL_ID=~/models/whisper-large-v3
+HF_HUB_OFFLINE=1
+```
+
+`~` is expanded automatically, so both `~/models/...` and absolute paths work.
+
+Point `LLM_HOST` at the AWS instance serving gemma, set `LLM_MODEL` to the bare model name, and use `LLM_API_STYLE=openai` for vLLM/TGI (OpenAI-compatible) or `LLM_API_STYLE=ollama` for Ollama. `LLM_HOST` may include `/v1` (it is normalized automatically), and `LLM_API_KEY` is sent as a bearer token when set:
+
+```bash
+LLM_HOST=https://chatbotdevgpu.infospica.com
+LLM_MODEL=google/gemma-4-E4B-it
+LLM_API_STYLE=openai
+LLM_API_KEY=
+```
 
 ## Running
 
@@ -130,7 +154,9 @@ All errors share one shape:
 
 ## Configuration
 
-All settings are environment variables; see `.env.example`. Key ones: `DEFAULT_STT_MODEL`, `WHISPER_MODEL_ID`, `INDICCONFORMER_DECODER` (`ctc`/`rnnt`), `MMS_TTS_MODEL_ID`, `CORS_ORIGINS`, `PRELOAD_MODELS`, `OUTPUT_DIR`, `MAX_UPLOAD_MB`, `TTS_MAX_CHARS`.
+All settings are environment variables; see `.env.example`. Key ones: `DEFAULT_STT_MODEL`, `DEFAULT_TTS_MODEL`, `DEFAULT_LLM_MODEL`, `WHISPER_MODEL_ID`, `INDICCONFORMER_DECODER` (`ctc`/`rnnt`), `MMS_TTS_MODEL_ID`, `INDIC_PARLER_TTS_MODEL_ID`, `INDIC_PARLER_TTS_DEVICE`, `INDIC_PARLER_TTS_DTYPE`, `INDIC_PARLER_TTS_MAX_AUDIO_SECONDS`, `LLM_HOST`, `LLM_MODEL`, `LLM_API_STYLE`, `LLM_API_KEY`, `LLM_MAX_TOKENS`, `CORS_ORIGINS`, `PRELOAD_MODELS`, `OUTPUT_DIR`, `MAX_UPLOAD_MB`, `TTS_MAX_CHARS`.
+
+The ARI stream also has VAD / half-duplex tuning: `ARI_VAD_ENERGY_THRESHOLD`, `ARI_VAD_SILENCE_SECONDS`, `ARI_VAD_MIN_SPEECH_SECONDS`, `ARI_VAD_PREROLL_SECONDS`, `ARI_FRAME_MS`, `ARI_ECHO_TAIL_SECONDS`.
 
 ## Tests
 
@@ -168,7 +194,7 @@ Caller (PSTN) → Jio SIP trunk → Asterisk PBX → ARI externalMedia → FastA
 3. Puts the caller channel and the `externalMedia` channel into one mixing bridge, so PCM audio flows bidirectionally between the caller and FastAPI.
 4. On `StasisEnd` (caller hangs up), hangs up `externalMedia` and destroys the bridge.
 
-FastAPI's `/ari/stream` WebSocket (already implemented in `api/ari_routes.py`) then runs the buffered STT → Ollama LLM → TTS pipeline on the caller's audio and streams PCM reply audio back.
+FastAPI's `/ari/stream` WebSocket (already implemented in `api/ari_routes.py`) runs the STT → remote LLM → TTS pipeline on the caller's audio and streams PCM reply audio back. It uses energy-based voice activity detection to decide when the caller has finished speaking, runs STT/LLM/TTS in worker threads, and is half-duplex: incoming audio is muted while the bot is synthesising/playing its reply so it does not transcribe its own voice.
 
 ### Files under `asterisk/`
 
@@ -219,6 +245,9 @@ Added to `.env` / `.env.example` under the ARI section:
 - `ARI_APP` — Stasis app name (must match `extensions.conf`, default `voice-bridge`)
 - `ARI_USER`, `ARI_PASSWORD` — ARI credentials (must match `ari.conf`)
 - `FASTAPI_HOST`, `FASTAPI_PORT`, `FASTAPI_PATH` — media endpoint Asterisk connects to (default `localhost:8000/ari/stream`)
+- `ARI_SAMPLE_RATE_IN`, `ARI_SAMPLE_RATE_OUT` — PCM sample rates (default `8000`)
+- `ARI_VAD_ENERGY_THRESHOLD`, `ARI_VAD_SILENCE_SECONDS`, `ARI_VAD_MIN_SPEECH_SECONDS`, `ARI_VAD_PREROLL_SECONDS` — end-of-utterance detection
+- `ARI_ECHO_TAIL_SECONDS` — how long to keep muting caller input after sending a reply (playback/echo drain)
 
 ### Jio SIP trunk
 

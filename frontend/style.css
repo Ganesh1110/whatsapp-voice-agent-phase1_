@@ -55,6 +55,8 @@ input[type="file"], select, textarea {
 textarea { resize: vertical; }
 
 .hint { color: var(--muted); font-size: .8rem; margin: .25rem 0 0; }
+.call-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.call-actions .btn { margin-top: 0; }
 .model-fixed { margin: 0; }
 .record-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
 .record-controls .btn { margin-top: 1rem; }

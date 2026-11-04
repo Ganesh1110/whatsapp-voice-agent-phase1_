@@ -31,7 +31,7 @@ def _output_dir() -> Path:
 
 @router.get("/tts/models", summary="List TTS models")
 def list_tts_models() -> dict:
-    return {"models": available_tts_models(), "default": os.getenv("DEFAULT_TTS_MODEL", "mms")}
+    return {"models": available_tts_models(), "default": os.getenv("DEFAULT_TTS_MODEL", "indic-parler-tts")}
 
 
 @router.post(
@@ -47,7 +47,7 @@ def list_tts_models() -> dict:
     },
 )
 def synthesize(request: TTSRequest) -> FileResponse:
-    model_name = (request.model or os.getenv("DEFAULT_TTS_MODEL", "mms")).strip().lower()
+    model_name = (request.model or os.getenv("DEFAULT_TTS_MODEL", "indic-parler-tts")).strip().lower()
     try:
         tts_model = get_tts_model(model_name)
     except UnknownTTSModelError as exc:

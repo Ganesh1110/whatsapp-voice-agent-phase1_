@@ -16,20 +16,23 @@
   <main class="container">
     <!-- Start Call: speak → AI responds (STT → LLM → TTS) -->
     <section class="card call-card" id="call-card" role="tabpanel" aria-label="Voice call">
-      <h2>📞 Start Call</h2>
-      <p class="hint">Press <b>Start Call</b>, speak, then press <b>Stop &amp; Respond</b>. The AI transcribes, replies, and speaks back.</p>
+      <h2>📞 Phone Call</h2>
+      <p class="hint">Click <b>Start Call</b>. The AI greets you first, then listens and replies automatically. Click <b>End Call</b> to hang up.</p>
 
       <div id="callStatus" class="status"></div>
 
       <button class="btn call-btn" id="callBtn" type="button">▶ Start Call</button>
-      <button class="btn secondary hidden" id="callStopBtn" type="button">⏹ Stop &amp; Respond</button>
 
       <div class="loading hidden" id="callLoading"><span class="spinner"></span> AI is thinking… STT → LLM → TTS</div>
       <div class="error hidden" id="callError" role="alert"></div>
 
       <div class="result hidden" id="callResult">
         <h3>You said</h3>
-        <textarea id="callText" rows="2" readonly></textarea>
+        <textarea id="callText" rows="2" placeholder="Type your answer here, or speak…"></textarea>
+        <div class="call-actions">
+          <button class="btn" id="callSendBtn" type="button">Send typed message</button>
+          <button class="btn secondary" id="callListenBtn" type="button">🎙 Speak instead</button>
+        </div>
 
         <h3>AI reply</h3>
         <textarea id="callReply" rows="2" readonly></textarea>
