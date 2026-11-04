@@ -55,6 +55,8 @@ input[type="file"], select, textarea {
 textarea { resize: vertical; }
 
 .hint { color: var(--muted); font-size: .8rem; margin: .25rem 0 0; }
+.call-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.call-actions .btn { margin-top: 0; }
 .model-fixed { margin: 0; }
 .record-controls { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
 .record-controls .btn { margin-top: 1rem; }
@@ -85,6 +87,25 @@ code { background: #eef0f7; padding: .1rem .4rem; border-radius: 4px; }
 
 .result audio { width: 100%; display: block; }
 .hidden { display: none !important; }
+
+/* ---- Start Call card ---- */
+.call-card { border-color: var(--primary); }
+.call-card h2 { margin-top: 0; display: flex; align-items: center; gap: .6rem; }
+.call-card .status { margin-top: .4rem; min-height: 1.2rem; }
+.call-btn {
+  background: #15803d; border: none; color: #fff; font-size: 1.15rem;
+  padding: 1rem 2rem; border-radius: 10px; cursor: pointer; margin-top: 1rem;
+  display: inline-flex; align-items: center; gap: .5rem;
+}
+.call-btn:hover { background: #166534; }
+.call-btn.recording { background: var(--error-text); }
+.call-btn.recording:hover { background: #991b1b; }
+.call-stop { background: var(--error-text); border-color: var(--error-text); color: #fff; }
+.call-stop:hover { background: #991b1b; border-color: #991b1b; }
+.call-result textarea { font-size: .95rem; }
+@media (max-width: 480px) {
+  .call-btn { width: 100%; justify-content: center; padding: 1rem 1.5rem; }
+}
 
 @media (max-width: 480px) {
   .header h1 { font-size: 1.4rem; }

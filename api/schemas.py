@@ -33,7 +33,7 @@ class STTModelsResponse(BaseModel):
 
 class TTSRequest(BaseModel):
     text: str = Field(..., description="Malayalam text to speak", examples=["നമസ്കാരം, സുഖമാണോ?"])
-    model: str = Field("mms", description="TTS model name")
+    model: str | None = Field(None, description="TTS model name; defaults to DEFAULT_TTS_MODEL")
 
     @field_validator("text")
     @classmethod
@@ -49,7 +49,7 @@ class TTSRequest(BaseModel):
 
 class LLMRequest(BaseModel):
     text: str = Field(..., description="Prompt to send to the LLM", examples=["എന്താണ് നിങ്ങുടെ പേര്?"])
-    model: str = Field("ollama", description="LLM model name")
+    model: str | None = Field(None, description="LLM model name; defaults to DEFAULT_LLM_MODEL")
     system: str | None = Field(
         None,
         description="Optional system instruction",

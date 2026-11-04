@@ -14,8 +14,17 @@ imageio-ffmpeg>=0.6          # bundled ffmpeg fallback for browser WebM recordin
 # --- Models ---
 torch>=2.1
 transformers>=4.40
+huggingface_hub[cli]>=0.34    # provides the `hf` CLI (`hf download ...`)
 onnxruntime>=1.17            # used by AI4Bharat IndicConformer (check the model card if loading fails)
 
 # --- Testing ---
 pytest>=8.0
 httpx>=0.27                  # needed by FastAPI's TestClient and the Ollama client
+
+# --- Asterisk ARI bridge (asterisk/ari_bridge.py) ---
+websockets>=12.0             # ARI events WebSocket client for the Stasis application
+
+# --- TTS: Indic Parler-TTS (ai4bharat/indic-parler-tts) ---
+# Installed from the HuggingFace parler-tts repo (required by tts/indic_parler_tts.py).
+# Install separately if you hit network restrictions:  pip install git+https://github.com/huggingface/parler-tts.git
+git+https://github.com/huggingface/parler-tts.git

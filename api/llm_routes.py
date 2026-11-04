@@ -21,7 +21,7 @@ router = APIRouter(tags=["Large Language Model"])
 def _default_model() -> str:
     import os
 
-    return os.getenv("DEFAULT_LLM_MODEL", "ollama")
+    return os.getenv("DEFAULT_LLM_MODEL", "remote")
 
 
 @router.get("/llm/models", response_model=dict, summary="List LLM models")

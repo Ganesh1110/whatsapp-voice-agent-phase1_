@@ -5,6 +5,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import FileResponse
@@ -33,8 +34,9 @@ ALLOWED_EXTENSIONS = {".wav", ".mp3", ".ogg", ".opus", ".m4a", ".mp4", ".flac", 
 CHUNK_SIZE = 1024 * 1024
 
 DEFAULT_SYSTEM = (
-    "You are a helpful voice assistant. Reply in the same language as the user "
-    "(preferably Malayalam). Keep answers short and natural for text-to-speech."
+    "You are a helpful voice assistant. Reply in Malayalam with one short "
+    "sentence of about 15-20 words. English technical words are fine; natural "
+    "Malayalam-English mixing is allowed, and must sound natural for text-to-speech."
 )
 
 
@@ -42,6 +44,81 @@ def _output_dir() -> Path:
     path = Path(os.getenv("OUTPUT_DIR", "outputs"))
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _save_reply(result) -> tuple[str, Path]:
+    filename = f"voice_{uuid.uuid4().hex[:12]}.wav"
+    path = _output_dir() / filename
+    try:
+        save_wav(result, str(path))
+    except OSError as exc:
+        raise APIError(500, "Could not save audio", str(exc)) from exc
+    return filename, path
+
+
+@router.post(
+    "/voice/text",
+    summary="Voice assistant (typed): LLM reply spoken back as Malayalam audio",
+    response_class=FileResponse,
+    responses={
+        200: {"content": {"audio/wav": {}}, "description": "Reply audio (WAV)"},
+        400: {"model": ErrorResponse, "description": "Empty prompt or unknown model"},
+        500: {"model": ErrorResponse, "description": "Pipeline step failed"},
+        503: {"model": ErrorResponse, "description": "A model could not be loaded/reached"},
+    },
+)
+def voice_assistant_text(
+    text: str = Form(..., description="Typed message from the caller"),
+    llm_model: str = Form(None, description="LLM model name; defaults to DEFAULT_LLM_MODEL"),
+    tts_model: str = Form(None, description="TTS model name; defaults to DEFAULT_TTS_MODEL"),
+    system: str = Form(None, description="Optional system instruction for the LLM"),
+) -> FileResponse:
+    text = (text or "").strip()
+    if not text:
+        raise APIError(400, "Empty message", "Type a message before sending.")
+    if len(text) > 4000:
+        raise APIError(400, "Message too long", "Keep the typed message under 4000 characters.")
+
+    llm_name = (llm_model or os.getenv("DEFAULT_LLM_MODEL", "remote")).strip().lower()
+    tts_name = (tts_model or os.getenv("DEFAULT_TTS_MODEL", "indic-parler-tts")).strip().lower()
+
+    try:
+        llm = get_llm_model(llm_name)
+    except UnknownLLMModelError as exc:
+        raise APIError(400, "Unknown LLM model", str(exc)) from exc
+    try:
+        tts = get_tts_model(tts_name)
+    except UnknownTTSModelError as exc:
+        raise APIError(400, "Unknown TTS model", str(exc)) from exc
+
+    start = time.perf_counter()
+    try:
+        reply = llm.complete(text, system or DEFAULT_SYSTEM)
+        logger.info("Voice(text) LLM '%s': %s", llm_name, reply)
+        result = tts.synthesize(reply)
+        filename, path = _save_reply(result)
+    except LLMModelLoadError as exc:
+        raise APIError(503, "LLM unavailable", str(exc)) from exc
+    except CompletionError as exc:
+        raise APIError(500, "Completion failed", str(exc)) from exc
+    except TTSModelLoadError as exc:
+        raise APIError(503, "TTS model unavailable", str(exc)) from exc
+    except SynthesisError as exc:
+        raise APIError(500, "Speech generation failed", str(exc)) from exc
+
+    elapsed = round(time.perf_counter() - start, 2)
+    logger.info("Voice(text) pipeline finished in %.2fs", elapsed)
+    return FileResponse(
+        path,
+        media_type="audio/wav",
+        filename=filename,
+        headers={
+            "X-Input-Text": quote(text, safe=""),
+            "X-Llm-Reply": quote(reply, safe=""),
+            "X-Processing-Seconds": str(elapsed),
+            "Access-Control-Expose-Headers": "X-Input-Text, X-Llm-Reply, X-Processing-Seconds",
+        },
+    )
 
 
 @router.post(
@@ -66,8 +143,8 @@ def voice_assistant(
 ) -> FileResponse:
     stt_name = (stt_model or os.getenv("DEFAULT_STT_MODEL", "whisper")).strip().lower()
     language = (language or os.getenv("DEFAULT_LANGUAGE", "ml")).strip().lower()
-    llm_name = (llm_model or os.getenv("DEFAULT_LLM_MODEL", "ollama")).strip().lower()
-    tts_name = (tts_model or os.getenv("DEFAULT_TTS_MODEL", "mms")).strip().lower()
+    llm_name = (llm_model or os.getenv("DEFAULT_LLM_MODEL", "remote")).strip().lower()
+    tts_name = (tts_model or os.getenv("DEFAULT_TTS_MODEL", "indic-parler-tts")).strip().lower()
 
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_EXTENSIONS:
@@ -109,6 +186,12 @@ def voice_assistant(
 
         text = stt.transcribe(tmp_path, language)
         logger.info("Voice STT '%s': %s", stt_name, text)
+        if not text.strip():
+            raise APIError(
+                400,
+                "No speech detected",
+                "The recording was silent or too short. Try again or type your message.",
+            )
 
         # --- LLM ---
         system_prompt = system or DEFAULT_SYSTEM
@@ -135,8 +218,8 @@ def voice_assistant(
             media_type="audio/wav",
             filename=filename,
             headers={
-                "X-Stt-Text": text,
-                "X-Llm-Reply": reply,
+                "X-Stt-Text": quote(text, safe=""),
+                "X-Llm-Reply": quote(reply, safe=""),
                 "X-Processing-Seconds": str(elapsed),
                 "Access-Control-Expose-Headers": "X-Stt-Text, X-Llm-Reply, X-Processing-Seconds",
             },
