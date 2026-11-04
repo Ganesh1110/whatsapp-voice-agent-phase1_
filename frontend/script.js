@@ -318,7 +318,8 @@ let callIsRecording = false;
 
 function clearCallRecording() {
   callRecordedBlob = null;
-  hide($("callRecordingPreview")); // no preview element; kept for symmetry
+  const preview = $("callRecordingPreview");
+  if (preview) hide(preview);
   if (callRecordingUrl) URL.revokeObjectURL(callRecordingUrl);
   callRecordingUrl = null;
 }
