@@ -309,4 +309,139 @@ $("voiceBtn").addEventListener("click", async () => {
   }
 });
 
+// ---------- Start Call: record → STT → LLM → TTS → play back ----------
+let callMediaRecorder = null;
+let callMicStream = null;
+let callRecordedBlob = null;
+let callRecordingUrl = null;
+let callIsRecording = false;
+
+function clearCallRecording() {
+  callRecordedBlob = null;
+  hide($("callRecordingPreview")); // no preview element; kept for symmetry
+  if (callRecordingUrl) URL.revokeObjectURL(callRecordingUrl);
+  callRecordingUrl = null;
+}
+
+function setCallBusy(busy) {
+  $("callBtn").disabled = busy;
+  $("callStopBtn").disabled = busy;
+  busy ? show($("callLoading")) : hide($("callLoading"));
+}
+
+$("callBtn").addEventListener("click", async () => {
+  if (callIsRecording) {
+    // Already recording: stop and respond.
+    if (callMediaRecorder?.state === "recording") callMediaRecorder.stop();
+    return;
+  }
+
+  hide($("callError"));
+  hide($("callResult"));
+  clearCallRecording();
+  $("callAudio").src = "";
+  $("callText").value = "";
+  $("callReply").value = "";
+
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    $("callError").textContent = "Audio recording is not supported in this browser. Use Chrome, Edge, Firefox, or Safari.";
+    show($("callError"));
+    return;
+  }
+
+  try {
+    callMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"]
+      .find((type) => MediaRecorder.isTypeSupported(type));
+    callMediaRecorder = mimeType ? new MediaRecorder(callMicStream, { mimeType }) : new MediaRecorder(callMicStream);
+    const chunks = [];
+    callMediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size) chunks.push(event.data);
+    });
+    callMediaRecorder.addEventListener("stop", async () => {
+      const type = callMediaRecorder.mimeType || "audio/webm";
+      callRecordedBlob = new Blob(chunks, { type });
+      const extension = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "mp4" : "webm";
+      callRecordedBlob.fileName = `call.${extension}`;
+      callRecordingUrl = URL.createObjectURL(callRecordedBlob);
+
+      callIsRecording = false;
+      $("callBtn").textContent = "▶ Start Call";
+      $("callBtn").classList.remove("recording");
+      hide($("callStopBtn"));
+      show($("callBtn"));
+      callMicStream?.getTracks().forEach((track) => track.stop());
+      callMicStream = null;
+      callMediaRecorder = null;
+
+      await sendCallAudio();
+    }, { once: true });
+    callMediaRecorder.start();
+    callIsRecording = true;
+    hide($("callBtn"));
+    show($("callStopBtn"));
+    $("callStopBtn").classList.add("call-stop");
+    $("callStatus").textContent = "● Recording… speak now";
+    $("callStatus").className = "status down";
+  } catch (err) {
+    callMicStream?.getTracks().forEach((track) => track.stop());
+    callMicStream = null;
+    callIsRecording = false;
+    $("callError").textContent = err.name === "NotAllowedError"
+      ? "Microphone permission was denied. Allow microphone access and try again."
+      : `Could not start recording: ${err.message}`;
+    show($("callError"));
+  }
+});
+
+$("callStopBtn").addEventListener("click", () => {
+  if (callMediaRecorder?.state === "recording") callMediaRecorder.stop();
+});
+
+async function sendCallAudio() {
+  const file = callRecordedBlob && new File([callRecordedBlob], callRecordedBlob.fileName, { type: callRecordedBlob.type });
+  hide($("callError"));
+  hide($("callResult"));
+
+  if (!file) {
+    $("callError").textContent = "No audio was recorded. Try again.";
+    show($("callError"));
+    $("callStatus").textContent = "";
+    return;
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  // Rely on backend defaults (whisper → remote gemma → indic-parler-tts) set in .env.
+  // Uncomment to override per-call:
+  // form.append("stt_model", "whisper");
+  // form.append("llm_model", "remote");
+  // form.append("tts_model", "indic-parler-tts");
+
+  setCallBusy(true);
+  $("callStatus").textContent = "● Processing…";
+  try {
+    const res = await fetch(`${API_BASE}/voice`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await errorMessage(res));
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    $("callAudio").src = url;
+    $("callDownload").href = url;
+    $("callText").value = res.headers.get("X-Stt-Text") || "(no speech recognised)";
+    $("callReply").value = res.headers.get("X-Llm-Reply") || "";
+    show($("callResult"));
+    $("callAudio").play().catch(() => {}); // autoplay may be blocked; controls still work
+    $("callStatus").textContent = "● AI responded — audio playing above";
+    $("callStatus").className = "status ok";
+  } catch (err) {
+    $("callError").textContent = err instanceof TypeError ? networkMessage() : err.message;
+    show($("callError"));
+    $("callStatus").textContent = "";
+  } finally {
+    setCallBusy(false);
+    clearCallRecording();
+  }
+}
+
 checkHealth();

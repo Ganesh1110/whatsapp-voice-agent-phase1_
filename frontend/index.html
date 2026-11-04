@@ -14,6 +14,32 @@
   </header>
 
   <main class="container">
+    <!-- Start Call: speak → AI responds (STT → LLM → TTS) -->
+    <section class="card call-card" id="call-card" role="tabpanel" aria-label="Voice call">
+      <h2>📞 Start Call</h2>
+      <p class="hint">Press <b>Start Call</b>, speak, then press <b>Stop &amp; Respond</b>. The AI transcribes, replies, and speaks back.</p>
+
+      <div id="callStatus" class="status"></div>
+
+      <button class="btn call-btn" id="callBtn" type="button">▶ Start Call</button>
+      <button class="btn secondary hidden" id="callStopBtn" type="button">⏹ Stop &amp; Respond</button>
+
+      <div class="loading hidden" id="callLoading"><span class="spinner"></span> AI is thinking… STT → LLM → TTS</div>
+      <div class="error hidden" id="callError" role="alert"></div>
+
+      <div class="result hidden" id="callResult">
+        <h3>You said</h3>
+        <textarea id="callText" rows="2" readonly></textarea>
+
+        <h3>AI reply</h3>
+        <textarea id="callReply" rows="2" readonly></textarea>
+
+        <h3>Spoken reply</h3>
+        <audio id="callAudio" controls autoplay></audio>
+        <a class="btn secondary" id="callDownload" download="reply.wav">⬇ Download reply</a>
+      </div>
+    </section>
+
     <!-- Tabs -->
     <nav class="tabs" role="tablist">
       <button class="tab active" role="tab" aria-selected="true" data-tab="stt">🎙️ Speech to Text</button>
@@ -105,12 +131,14 @@
         <div style="flex:1; min-width:140px;">
           <label for="voiceLlmModel">LLM model</label>
           <select id="voiceLlmModel">
+            <option value="remote">Remote (gemma-4-E4B-it on AWS)</option>
             <option value="ollama">Ollama (llama3.1:8b)</option>
           </select>
         </div>
         <div style="flex:1; min-width:140px;">
           <label for="voiceTtsModel">TTS model</label>
           <select id="voiceTtsModel">
+            <option value="indic-parler-tts">Indic Parler-TTS (Malayalam)</option>
             <option value="mms">MMS TTS (Malayalam)</option>
           </select>
         </div>
