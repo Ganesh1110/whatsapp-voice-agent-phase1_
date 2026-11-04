@@ -47,8 +47,33 @@ class TTSRequest(BaseModel):
         return value
 
 
+class LLMRequest(BaseModel):
+    text: str = Field(..., description="Prompt to send to the LLM", examples=["എന്താണ് നിങ്ങുടെ പേര്?"])
+    model: str = Field("ollama", description="LLM model name")
+    system: str | None = Field(
+        None,
+        description="Optional system instruction",
+        examples=["You are a helpful assistant. Reply in Malayalam."],
+    )
+
+    @field_validator("text")
+    @classmethod
+    def validate_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Text must not be empty.")
+        return value
+
+
+class LLMResponse(BaseModel):
+    reply: str = Field(..., description="The model's reply")
+    model: str = Field(..., description="LLM model that produced the reply")
+    processing_seconds: float
+
+
 class HealthResponse(BaseModel):
     status: str = "ok"
     stt_models: list[str]
     tts_models: list[str]
+    llm_models: list[str] = Field(default_factory=list)
     loaded_models: list[str] = Field(default_factory=list)

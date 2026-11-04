@@ -39,7 +39,7 @@ document.querySelectorAll(".tab").forEach((tab) => {
       t.classList.toggle("active", t === tab);
       t.setAttribute("aria-selected", t === tab);
     });
-    ["stt", "tts"].forEach((name) => {
+    ["stt", "tts", "voice"].forEach((name) => {
       name === tab.dataset.tab ? show($(`tab-${name}`)) : hide($(`tab-${name}`));
     });
   });
@@ -195,6 +195,117 @@ $("ttsBtn").addEventListener("click", async () => {
     show($("ttsError"));
   } finally {
     setBusy($("ttsBtn"), $("ttsLoading"), false);
+  }
+});
+
+// ---------- Voice Assistant (STT -> Ollama -> TTS) ----------
+let voiceMediaRecorder = null;
+let voiceMicStream = null;
+let voiceRecordedBlob = null;
+let voiceRecordingUrl = null;
+
+function clearVoiceRecording() {
+  voiceRecordedBlob = null;
+  hide($("voiceRecordingPreview"));
+  if (voiceRecordingUrl) URL.revokeObjectURL(voiceRecordingUrl);
+  voiceRecordingUrl = null;
+}
+
+$("voiceFile").addEventListener("change", clearVoiceRecording);
+
+$("voiceRecordBtn").addEventListener("click", async () => {
+  hide($("voiceError"));
+  clearVoiceRecording();
+  $("voiceFile").value = "";
+
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    $("voiceError").textContent = "Audio recording is not supported in this browser. Try Chrome, Edge, Firefox, or Safari.";
+    show($("voiceError"));
+    return;
+  }
+
+  try {
+    voiceMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"]
+      .find((type) => MediaRecorder.isTypeSupported(type));
+    voiceMediaRecorder = mimeType ? new MediaRecorder(voiceMicStream, { mimeType }) : new MediaRecorder(voiceMicStream);
+    const chunks = [];
+    voiceMediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data.size) chunks.push(event.data);
+    });
+    voiceMediaRecorder.addEventListener("stop", () => {
+      const type = voiceMediaRecorder.mimeType || "audio/webm";
+      voiceRecordedBlob = new Blob(chunks, { type });
+      const extension = type.includes("ogg") ? "ogg" : type.includes("mp4") ? "mp4" : "webm";
+      voiceRecordedBlob.fileName = `recording.${extension}`;
+      voiceRecordingUrl = URL.createObjectURL(voiceRecordedBlob);
+      $("voiceRecordingPreview").src = voiceRecordingUrl;
+      show($("voiceRecordingPreview"));
+      hide($("voiceRecordingStatus"));
+      show($("voiceRecordBtn"));
+      hide($("voiceStopRecordBtn"));
+      voiceMicStream?.getTracks().forEach((track) => track.stop());
+      voiceMicStream = null;
+      $("voiceBtn").disabled = false;
+    }, { once: true });
+    voiceMediaRecorder.start();
+    hide($("voiceRecordBtn"));
+    show($("voiceStopRecordBtn"));
+    show($("voiceRecordingStatus"));
+    $("voiceBtn").disabled = true;
+  } catch (err) {
+    voiceMicStream?.getTracks().forEach((track) => track.stop());
+    voiceMicStream = null;
+    $("voiceError").textContent = err.name === "NotAllowedError"
+      ? "Microphone permission was denied. Allow microphone access and try again."
+      : `Could not start recording: ${err.message}`;
+    show($("voiceError"));
+  }
+});
+
+$("voiceStopRecordBtn").addEventListener("click", () => {
+  if (voiceMediaRecorder?.state === "recording") voiceMediaRecorder.stop();
+});
+
+$("voiceBtn").addEventListener("click", async () => {
+  const file = $("voiceFile").files[0] || (voiceRecordedBlob && new File([voiceRecordedBlob], voiceRecordedBlob.fileName, { type: voiceRecordedBlob.type }));
+  hide($("voiceError"));
+  hide($("voiceResult"));
+
+  if (!file) {
+    $("voiceError").textContent = "Choose an audio file or record your voice first.";
+    show($("voiceError"));
+    return;
+  }
+
+  const form = new FormData();
+  form.append("file", file);
+  form.append("stt_model", $("voiceSttModel").value);
+  form.append("llm_model", $("voiceLlmModel").value);
+  form.append("tts_model", $("voiceTtsModel").value);
+  const system = $("voiceSystem").value.trim();
+  if (system) form.append("system", system);
+
+  setBusy($("voiceBtn"), $("voiceLoading"), true);
+  try {
+    const res = await fetch(`${API_BASE}/voice`, { method: "POST", body: form });
+    if (!res.ok) throw new Error(await errorMessage(res));
+
+    const blob = await res.blob();
+    if (lastAudioUrl) URL.revokeObjectURL(lastAudioUrl);
+    lastAudioUrl = URL.createObjectURL(blob);
+
+    $("voiceText").value = res.headers.get("X-Stt-Text") || "";
+    $("voiceReply").value = res.headers.get("X-Llm-Reply") || "";
+    $("voiceAudio").src = lastAudioUrl;
+    $("voiceDownload").href = lastAudioUrl;
+    show($("voiceResult"));
+    $("voiceAudio").play().catch(() => {});
+  } catch (err) {
+    $("voiceError").textContent = err instanceof TypeError ? networkMessage() : err.message;
+    show($("voiceError"));
+  } finally {
+    setBusy($("voiceBtn"), $("voiceLoading"), false);
   }
 });
 
