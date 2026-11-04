@@ -31,6 +31,7 @@ class UnknownTTSModelError(TTSError):
 
 _BUILTIN: dict[str, object] = {
     "mms": "tts.mms_tts:MMSTTS",
+    "indic-parler-tts": "tts.indic_parler_tts:IndicParlerTTS",
 }
 _instances: dict[str, BaseTTS] = {}
 _lock = threading.Lock()

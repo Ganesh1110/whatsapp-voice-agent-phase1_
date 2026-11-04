@@ -28,6 +28,7 @@ class UnknownLLMModelError(LLMError):
 # name -> "module:Class" (imported lazily) or a class registered at runtime.
 _BUILTIN: dict[str, object] = {
     "ollama": "llm.ollama:OllamaLLM",
+    "remote": "llm.remote:RemoteLLM",
 }
 _instances: dict[str, BaseLLM] = {}
 _lock = threading.Lock()
